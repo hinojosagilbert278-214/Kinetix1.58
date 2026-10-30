@@ -92,3 +92,17 @@ def test_pipeline_routing():
     eng = HybridEngine(web, priv, lambda q, c: "local", lambda q, c: "cloud")
     assert eng.ask("summarize my leave policy").engine == "local"
     assert eng.ask("compare our internal spec to the latest rfc").engine == "cloud"
+
+
+def test_pluggable_embedder():
+    class Const:
+        def encode(self, text):
+            return [1.0, 0.0] if "cat" in text else [0.0, 1.0]
+
+    i = HybridIndex(alpha=0.0, embedder=Const())
+    i.add(Doc("a", "cat"))
+    i.add(Doc("b", "dog"))
+    assert i.search("cat")[0][0].id == "a"
+    s = DualStore(embedder=Const())
+    s.ingest(DOC)
+    assert s.search("leave", 1)
