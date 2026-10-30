@@ -12,3 +12,7 @@ Run tests: `python -m pytest`
 - `csrc/bitnet_kernels.cpp` (`make lib`, bound via `kinetix/native.py`): ternary packing, ternary GEMV, 2:4 sparse GEMV, XNOR/popcount dot. CPU only; no CUDA yet.
 - `gateway/` (Go): Envoy `ext_proc` service that classifies requests and sets `x-kinetix-route` / `x-kinetix-engine`; `envoy.yaml` is a routing sketch. Run tests: `cd gateway && go test ./...`. The classifier is still keyword-based (no ONNX model yet).
 - `kinetix/retrieval.py`: pluggable embedders. `HashEmbedder` is the default; `OnnxEmbedder` wraps an ONNX bi-encoder (needs `onnxruntime`, `tokenizers`, `numpy`; untested without a model).
+
+### Live gateway stack
+
+`gateway/docker-compose.yml` runs Envoy + the `ext_proc` service + two mock upstreams (`docker compose up --build`, then `curl localhost:8080/ -d '{"prompt":"my policy"}'`). Verified manually with plain `docker run` on a shared network; the compose file itself was not executed (no compose plugin in the dev environment).

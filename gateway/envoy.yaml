@@ -14,7 +14,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
               grpc_service: {envoy_grpc: {cluster_name: kinetix_extproc}}
-              processing_mode: {request_header_mode: SEND, request_body_mode: BUFFERED}
+              processing_mode: {request_header_mode: SEND, request_body_mode: BUFFERED, response_header_mode: SKIP, response_body_mode: NONE}
           - name: envoy.filters.http.router
             typed_config: {"@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router}
           route_config:

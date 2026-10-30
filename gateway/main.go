@@ -94,6 +94,14 @@ func (s *server) Process(stream extproc.ExternalProcessor_ProcessServer) error {
 					}},
 				},
 			}}
+		case *extproc.ProcessingRequest_ResponseHeaders:
+			resp.Response = &extproc.ProcessingResponse_ResponseHeaders{ResponseHeaders: &extproc.HeadersResponse{}}
+		case *extproc.ProcessingRequest_ResponseBody:
+			resp.Response = &extproc.ProcessingResponse_ResponseBody{ResponseBody: &extproc.BodyResponse{}}
+		case *extproc.ProcessingRequest_RequestTrailers:
+			resp.Response = &extproc.ProcessingResponse_RequestTrailers{RequestTrailers: &extproc.TrailersResponse{}}
+		case *extproc.ProcessingRequest_ResponseTrailers:
+			resp.Response = &extproc.ProcessingResponse_ResponseTrailers{ResponseTrailers: &extproc.TrailersResponse{}}
 		default:
 			continue
 		}
