@@ -16,3 +16,8 @@ Run tests: `python -m pytest`
 ### Live gateway stack
 
 `gateway/docker-compose.yml` runs Envoy + the `ext_proc` service + two mock upstreams (`docker compose up --build`, then `curl localhost:8080/ -d '{"prompt":"my policy"}'`). Verified manually with plain `docker run` on a shared network; the compose file itself was not executed (no compose plugin in the dev environment).
+
+### GPU and ONNX status
+
+- `csrc/bitnet_kernels.cu`: CUDA-core kernels, compile-checked to sm_80 SASS only (never run). Tensor Core plan: `docs/cuda_sparse_tensor_core.md`.
+- `bench/onnx_latency.py`: set `MODEL_PATH`/`TOKENIZER_PATH` for a real model; otherwise it times a synthetic model (ORT call floor only). No real model was available in the dev environment. The Go gateway does not use ONNX yet.
