@@ -1,0 +1,17 @@
+services:
+  gateway:
+    build: .
+    command: ["/usr/local/bin/gateway", "-addr", ":50051"]
+  local-slm:
+    build: .
+    command: ["/usr/local/bin/mock"]
+    environment: {NAME: local-slm}
+  cloud-vllm:
+    build: .
+    command: ["/usr/local/bin/mock"]
+    environment: {NAME: cloud-vllm}
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    volumes: ["./envoy.yaml:/etc/envoy/envoy.yaml:ro"]
+    ports: ["8080:8080"]
+    depends_on: [gateway, local-slm, cloud-vllm]

@@ -22,6 +22,46 @@ def embed(text: str) -> list[float]:
     return [x / n for x in v]
 
 
+class HashEmbedder:
+    """Zero-dependency default embedder."""
+
+    def encode(self, text: str) -> list[float]:
+        return embed(text)
+
+
+class OnnxEmbedder:
+    """Bi-encoder (e.g. quantized BGE / MiniLM exported to ONNX). Needs onnxruntime, tokenizers, numpy.
+
+    `model_path` is the .onnx file and `tokenizer_path` its tokenizer.json.
+    """
+
+    def __init__(self, model_path: str, tokenizer_path: str, max_len: int = 256):
+        import numpy as np
+        import onnxruntime as ort
+        from tokenizers import Tokenizer
+
+        self._np = np
+        self.sess = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        self.tok = Tokenizer.from_file(tokenizer_path)
+        self.tok.enable_truncation(max_len)
+        self.tok.enable_padding()
+        self.inputs = {i.name for i in self.sess.get_inputs()}
+
+    def encode(self, text: str) -> list[float]:
+        np = self._np
+        enc = self.tok.encode(text)
+        feed = {
+            "input_ids": np.array([enc.ids], dtype=np.int64),
+            "attention_mask": np.array([enc.attention_mask], dtype=np.int64),
+            "token_type_ids": np.zeros((1, len(enc.ids)), dtype=np.int64),
+        }
+        hidden = self.sess.run(None, {k: v for k, v in feed.items() if k in self.inputs})[0][0]
+        mask = np.array(enc.attention_mask, dtype=np.float32)[:, None]
+        v = (hidden * mask).sum(0) / max(mask.sum(), 1.0)  # mean pooling
+        v = v / (np.linalg.norm(v) or 1.0)
+        return v.tolist()
+
+
 def _cos(a, b):
     return sum(x * y for x, y in zip(a, b))
 
@@ -34,7 +74,8 @@ class Doc:
 
 
 class HybridIndex:
-    def __init__(self, k1=1.5, b=0.75, alpha=0.5):
+    def __init__(self, k1=1.5, b=0.75, alpha=0.5, embedder=None):
+        self.embedder = embedder or HashEmbedder()
         self.docs: list[Doc] = []
         self.tf: list[Counter] = []
         self.vecs: list[list[float]] = []
@@ -45,7 +86,7 @@ class HybridIndex:
         c = Counter(tokenize(doc.text))
         self.docs.append(doc)
         self.tf.append(c)
-        self.vecs.append(embed(doc.text))
+        self.vecs.append(self.embedder.encode(doc.text))
         self.df.update(c.keys())
 
     def _bm25(self, q: list[str]) -> list[float]:
@@ -67,7 +108,7 @@ class HybridIndex:
             return []
         bm = self._bm25(tokenize(query))
         mx = max(bm) or 1.0
-        qv = embed(query)
+        qv = self.embedder.encode(query)
         scored = [
             (d, self.alpha * (b / mx) + (1 - self.alpha) * max(_cos(qv, v), 0.0))
             for d, b, v in zip(self.docs, bm, self.vecs)
@@ -93,8 +134,8 @@ def parent_child_chunks(markdown: str, source="doc"):
 class DualStore:
     """Search small (child index), read big (parent KV lookup)."""
 
-    def __init__(self):
-        self.children = HybridIndex()
+    def __init__(self, embedder=None):
+        self.children = HybridIndex(embedder=embedder)
         self.parents: dict[str, Doc] = {}
 
     def ingest(self, markdown: str, source="doc"):

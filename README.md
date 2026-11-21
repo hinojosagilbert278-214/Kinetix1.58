@@ -6,3 +6,18 @@ Hybrid AI Model
 Stdlib-only Python modules in `kinetix/`: `router` (intent gatekeeper), `retrieval` (BM25+dense, parent-child dual store), `stepgate` (risk/uncertainty gate), `bitnet` (ternary BitLinear, 4-per-byte packing, N:M sparsity), `acespec` (edge-cloud speculative decoding simulation), `pipeline` (orchestration).
 
 Run tests: `python -m pytest`
+
+### Native kernels, gateway, embeddings
+
+- `csrc/bitnet_kernels.cpp` (`make lib`, bound via `kinetix/native.py`): ternary packing, ternary GEMV, 2:4 sparse GEMV, XNOR/popcount dot. CPU only; no CUDA yet.
+- `gateway/` (Go): Envoy `ext_proc` service that classifies requests and sets `x-kinetix-route` / `x-kinetix-engine`; `envoy.yaml` is a routing sketch. Run tests: `cd gateway && go test ./...`. The classifier is still keyword-based (no ONNX model yet).
+- `kinetix/retrieval.py`: pluggable embedders. `HashEmbedder` is the default; `OnnxEmbedder` wraps an ONNX bi-encoder (needs `onnxruntime`, `tokenizers`, `numpy`; untested without a model).
+
+### Live gateway stack
+
+`gateway/docker-compose.yml` runs Envoy + the `ext_proc` service + two mock upstreams (`docker compose up --build`, then `curl localhost:8080/ -d '{"prompt":"my policy"}'`). Verified manually with plain `docker run` on a shared network; the compose file itself was not executed (no compose plugin in the dev environment).
+
+### GPU and ONNX status
+
+- `csrc/bitnet_kernels.cu`: CUDA-core kernels, compile-checked to sm_80 SASS only (never run). Tensor Core plan: `docs/cuda_sparse_tensor_core.md`.
+- `bench/onnx_latency.py`: set `MODEL_PATH`/`TOKENIZER_PATH` for a real model; otherwise it times a synthetic model (ORT call floor only). No real model was available in the dev environment. The Go gateway does not use ONNX yet.
